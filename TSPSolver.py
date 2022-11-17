@@ -169,10 +169,65 @@ class TSPSolver:
 		algorithm</returns> 
 	'''
 	def twoOpt( self,time_allowance=60.0 ):
-		pass
+		results = {}
+		cities = self._scenario.getCities()
+
+		start_time = time.time()
+
+		best_solution = self.greedy()['soln']
+		improved = True
+		while improved:
+			improved = False
+			for i in range(len(cities)-1):
+				for j in range(i+1, len(cities)):
+					# Building the new route and calculating the distance of the new route can be a very expensive
+					# operation, usually O(n) where n is the number of vertices in the route. This can be converted
+					# into an O(1) operation. Since a 2-opt operation involves removing 2 edges and adding 2 different
+					# edges we can subtract and add the distances of only those edges.
+					#
+					# If lengthDelta is negative that would mean that the new distance after the swap would be smaller.
+					# Once it is known that lengthDelta is negative, then we perform a 2-opt swap. This saves us a lot
+					# of computation.
+					length_delta = -cities[i].costTo(cities[(i + 1) % len(cities)]) \
+					               - cities[j].costTo(cities[(j + 1) % len(cities)]) \
+					               + cities[i].costTo(cities[j]) \
+					               + cities[(i + 1) % len(cities)].costTo(cities[(j + 1) % len(cities)])
+					if length_delta < 0:
+						new_path = self.twoOptSwap(best_solution.route, i, j)
+						new_cost = TSPSolution(new_path).cost
+						if new_cost < best_solution.cost:
+							improved = True
+							best_solution = TSPSolution(new_path)
+
+		end_time = time.time()
+
+		results['cost'] = best_solution.cost
+		results['time'] = end_time - start_time
+		results['count'] = 0 #TODO: change
+		results['soln'] = best_solution
+		return results
+
+
+	def twoOptSwap(self, path, v1, v2):
+		new_path = []
+
+		# take path[0] to path[v1] and add them in order to new_path
+		new_path += path[:v1]
+
+		# take path[v1+1] to path[v2] and add them in reverse order to new_path
+		new_path += path[v1:v2][::-1]
+
+		# take path[v2+1] to path[end] and add them in order to new_path
+		new_path += path[v2:]
+
+		return new_path
 
 
 	def threeOpt( self,time_allowance=60.0 ):
+		pass
+
+
+	def threeOptSwap(self, path, v1, v2):
 		pass
 
 
