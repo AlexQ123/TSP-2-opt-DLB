@@ -10,7 +10,6 @@ else:
 
 
 
-
 import time
 import numpy as np
 from TSPClasses import *
@@ -37,7 +36,6 @@ class TSPSolver:
 		solution found, and three null values for fields not used for this 
 		algorithm</returns> 
 	'''
-	
 	def defaultRandomTour( self, time_allowance=60.0 ):
 		results = {}
 		cities = self._scenario.getCities()
@@ -80,9 +78,72 @@ class TSPSolver:
 		solution found, and three null values for fields not used for this 
 		algorithm</returns> 
 	'''
-
+	# Solves TSP using a greedy algorithm.
+	#
+	# The time complexity of this function is O(n^3). This is because in the worst case, we have to use every single
+	# city as the starting city. Then, for each starting city, we could potentially go to every single other city just
+	# to find that there is no solution. As we are greedily going through each city (for a particular starting city),
+	# we have to check the path to all of the neighboring cities. There could be n neighboring cities in the worst case,
+	# and checking these n neighbors n times has a time complexity of O(n^2). Doing this for every single one of n starting
+	# cities results in a time complexity of O(n^3).
+	#
+	# The space complexity of this function is O(n). This is because the only space we use (aside from storing constant
+	# space variables) is for visited_cities, cities, and route. Each of these holds at most n cities at any given time
+	# because even if we have to check multiple starting cities, the while loop resets these variables each time. Thus,
+	# the space complexity is O(n + n + n) which generalizes to O(n).
 	def greedy( self,time_allowance=60.0 ):
-		pass
+		results = {}
+		cities = self._scenario.getCities()
+		start_city_index = 0
+		bssf = None
+
+		start_time = time.time()
+
+		# timeout constraint
+		while time.time() - start_time < time_allowance:
+			# for each different starting city we run greedy on, keep track of the cities that have already been visited
+			visited_cities = set()
+			current_city = cities[start_city_index]
+			route = [current_city]
+			visited_cities.add(current_city)
+
+			# while we haven't visited all cities
+			while len(visited_cities) != len(cities):
+				shortest = math.inf
+				next_city_index = 0
+				# look at the distance from the current city to every other city, keep track of the shortest
+				for i in range(len(cities)):
+					# only look at the distance if we haven't already visited it
+					if cities[i] not in visited_cities:
+						cost = current_city.costTo(cities[i])
+						if cost < shortest:
+							shortest = cost
+							next_city_index = i
+				# we now know which is the shortest, and that's the city we go to next
+				next_city = cities[next_city_index]
+				# add the city to the solution and to visited
+				route.append(next_city)
+				visited_cities.add(next_city)
+				# update current_city
+				current_city = next_city
+
+			bssf = TSPSolution(route)
+
+			# if we did actually find a solution instead of hitting a dead end, we can break
+			#
+			# this accounts for looping back to the starting city because TSPSolution adds an edge from the last
+			# city of the route to the first, so if that edge is inf then this solution won't be used
+			if bssf.cost != math.inf:
+				break
+			start_city_index = start_city_index + 1
+
+		end_time = time.time()
+
+		results['cost'] = bssf.cost
+		results['time'] = end_time - start_time
+		results['count'] = 1
+		results['soln'] = bssf
+		return results
 	
 	
 	
@@ -94,7 +155,6 @@ class TSPSolver:
 		not include the initial BSSF), the best solution found, and three more ints: 
 		max queue size, total number of states created, and number of pruned states.</returns> 
 	'''
-		
 	def branchAndBound( self, time_allowance=60.0 ):
 		pass
 
@@ -108,10 +168,13 @@ class TSPSolver:
 		best solution found.  You may use the other three field however you like.
 		algorithm</returns> 
 	'''
-		
-	def fancy( self,time_allowance=60.0 ):
+	def twoOpt( self,time_allowance=60.0 ):
 		pass
-		
 
 
+	def threeOpt( self,time_allowance=60.0 ):
+		pass
 
+
+	def simulatedAnnealing( self,time_allowance=60.0 ):
+		pass
