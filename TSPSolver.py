@@ -185,7 +185,7 @@ class TSPSolver:
 					# into an O(1) operation. Since a 2-opt operation involves removing 2 edges and adding 2 different
 					# edges we can subtract and add the distances of only those edges.
 					#
-					# If lengthDelta is negative that would mean that the new distance after the swap would be smaller.
+					# If length_delta is negative that would mean that the new distance after the swap would be smaller.
 					# Once it is known that lengthDelta is negative, then we perform a 2-opt swap. This saves us a lot
 					# of computation.
 					length_delta = -cities[i].costTo(cities[(i + 1) % len(cities)]) \
@@ -224,11 +224,140 @@ class TSPSolver:
 
 
 	def threeOpt( self,time_allowance=60.0 ):
-		pass
+		results = {}
+		cities = self._scenario.getCities()
 
+		start_time = time.time()
 
-	def threeOptSwap(self, path, v1, v2):
-		pass
+		best_path = self.greedy()['soln'].route
+		improved = True
+		while improved:
+			improved = False
+			# for every possible combination of segments. Note that j starts and i+2 and k starts at j+2 because the
+			# idea with 3-opt swap is to have 3 subtours and recombine them in the best way. The 3 segments between
+			# the 3 subtours must consist of 2 cities, so there needs to be at least 1 city between i, j, and k so that
+			# no 2 segments share a city, hence the + 2. As for the line len(cities)-1+(i>0), we only allow k to be the
+			# last city if i is not the first city, because again there needs to be at least 1 city between i, j, and k.
+			for (i, j, k) in self.allPossibleSegmentCombinations(len(cities)):
+				# there are 8 possible opt cases for a 3-opt swap, including the case where you do nothing
+				opt_cases = {
+					0: 0,
+					1: 0,
+					2: 0,
+					3: 0,
+					4: 0,
+					5: 0,
+					6: 0,
+					7: 0
+				}
+				for opt_case in range(8):
+					opt_cases[opt_case] = self.calculateThreeOptSwap(best_path, i, j, k, opt_case)
+				# the opt_cases dictionary now maps each opt_case to how much it reduces the cost of the tour by,
+				# so we want to pick the opt_Case with the largest reduction value
+				best_case = max(opt_cases, key=opt_cases.get)
+				# if the best opt_case does in fact reduce the cost of the tour
+				if opt_cases[best_case] > 0:
+					best_path = self.reverseSegments(best_path, i, j, k, best_case)
+					improved = True
+					# break because now we've changed the tour, so we start over
+					break
+
+		end_time = time.time()
+
+		best_solution = TSPSolution(best_path)
+		results['cost'] = best_solution.cost
+		results['time'] = end_time - start_time
+		results['count'] = 0  # TODO: change
+		results['soln'] = best_solution
+		return results
+
+	def allPossibleSegmentCombinations(self, n):
+		return ((i, j, k)
+		        for i in range(n)
+		        for j in range(i + 2, n)
+		        for k in range(j + 2, n + (i > 0)))
+
+	# for the given opt_case, find the overall "reduction" of this case. meaning, calculate the total length of all
+	# the edges that are being deleted, and also calculate the total length of all the dges that are being added.
+	# return delete_length - add_length, which represents how much we can reduce the cost of the tour by if we use
+	# this opt_case.
+	def calculateThreeOptSwap(self, path, i, j, k, case):
+		# Given tour [...X1-X2...Y1-Y2...Z1-Z2...]
+		X1, X2, Y1, Y2, Z1, Z2 = path[i - 1], path[i], path[j - 1], path[j], path[k - 1], path[k % len(path)]
+
+		delete_length = 0
+		add_length = 0
+
+		# abc
+		if case == 0:
+			pass
+		# a'bc
+		elif case == 1:
+			delete_length = X1.costTo(X2) + Z1.costTo(Z2)
+			add_length = X1.costTo(Z1) + X2.costTo(Z2)
+		# abc'
+		elif case == 2:
+			delete_length = Y1.costTo(Y2) + Z1.costTo(Z2)
+			add_length = Y1.costTo(Z1) + Y2.costTo(Z2)
+		# ab'c
+		elif case == 3:
+			delete_length = X1.costTo(X2) + Y1.costTo(Y2)
+			add_length = X1.costTo(Y1) + X2.costTo(Y2)
+		# ab'c'
+		elif case == 4:
+			delete_length = X1.costTo(X2) + Y1.costTo(Y2) + Z1.costTo(Z2)
+			add_length = X1.costTo(Y1) + X2.costTo(Z1) + Y2.costTo(Z2)
+		# a'b'c
+		elif case == 5:
+			delete_length = X1.costTo(X2) + Y1.costTo(Y2) + Z1.costTo(Z2)
+			add_length = X1.costTo(Z1) + Y2.costTo(X2) + Y1.costTo(Z2)
+		# a'bc'
+		elif case == 6:
+			delete_length = X1.costTo(X2) + Y1.costTo(Y2) + Z1.costTo(Z2)
+			add_length = X1.costTo(Y2) + Z1.costTo(Y1) + X2.costTo(Z2)
+		# a'b'c'
+		elif case == 7:
+			delete_length = X1.costTo(X2) + Y1.costTo(Y2) + Z1.costTo(Z2)
+			add_length = X1.costTo(Y2) + Z1.costTo(X2) + Y1.costTo(Z2)
+
+		return delete_length - add_length
+
+	def reverseSegments(self, path, i, j, k, case):
+		new_path = []
+
+		if (i - 1) < (k % len(path)):
+			segment_1 = path[k % len(path):] + path[:i]
+		else:
+			segment_1 = path[k % len(path):i]
+		segment_2 = path[i:j]
+		segment_3 = path[j:k]
+
+		# abc
+		if case == 0:
+			return path
+		# a'bc
+		elif case == 1:
+			new_path = segment_1[::-1] + segment_2 + segment_3
+		# abc'
+		elif case == 2:
+			new_path = segment_1 + segment_2 + segment_3[::-1]
+		# ab'c
+		elif case == 3:
+			new_path = segment_1 + segment_2[::-1] + segment_3
+		# ab'c'
+		elif case == 4:
+			new_path = segment_1 + segment_2[::-1] + segment_3[::-1]
+		# a'b'c
+		elif case == 5:
+			new_path = segment_1[::-1] + segment_2[::-1] + segment_3
+		# a'bc'
+		elif case == 6:
+			new_path = segment_1[::-1] + segment_2 + segment_3[::-1]
+		# a'b'c'
+		elif case == 7:
+			new_path = segment_1[::-1] + segment_2[::-1] + segment_3[::-1]
+
+		return new_path
 
 
 	def simulatedAnnealing( self,time_allowance=60.0 ):
