@@ -172,6 +172,10 @@ class TSPSolver:
 		results = {}
 		cities = self._scenario.getCities()
 
+		dlb = {}
+		for i in range(len(cities)-1):
+			dlb[cities[i]] = False
+
 		start_time = time.time()
 
 		best_solution = self.greedy()['soln']
@@ -179,25 +183,30 @@ class TSPSolver:
 		while improved:
 			improved = False
 			for i in range(len(cities)-1):
-				for j in range(i+1, len(cities)):
-					# Building the new route and calculating the distance of the new route can be a very expensive
-					# operation, usually O(n) where n is the number of vertices in the route. This can be converted
-					# into an O(1) operation. Since a 2-opt operation involves removing 2 edges and adding 2 different
-					# edges we can subtract and add the distances of only those edges.
-					#
-					# If length_delta is negative that would mean that the new distance after the swap would be smaller.
-					# Once it is known that lengthDelta is negative, then we perform a 2-opt swap. This saves us a lot
-					# of computation.
-					length_delta = -cities[i].costTo(cities[(i + 1) % len(cities)]) \
-					               - cities[j].costTo(cities[(j + 1) % len(cities)]) \
-					               + cities[i].costTo(cities[j]) \
-					               + cities[(i + 1) % len(cities)].costTo(cities[(j + 1) % len(cities)])
-					if length_delta < 0:
+				if dlb[cities[i]]:
+					continue
+
+				dlb_breaker = False
+
+				for j in range(len(cities)-1):
+					if cities[i] == cities[j] or cities[(i+1) % len(cities)] == cities[j] or cities[(j+1) % len(cities)] == cities[i]:
+						continue
+
+					if self.lengthDeltaFromTwoOpt(cities, i, j) < 0:
+						dlb[cities[i]] = False
+						dlb[cities[(i+1) % len(cities)]] = False
+						dlb[cities[j]] = False
+						dlb[cities[(j+1) % len(cities)]] = False
 						new_path = self.twoOptSwap(best_solution.route, i, j)
 						new_cost = TSPSolution(new_path).cost
 						if new_cost < best_solution.cost:
 							improved = True
 							best_solution = TSPSolution(new_path)
+							dlb_breaker = True
+
+				if dlb_breaker:
+					break
+				dlb[cities[i]] = True
 
 		end_time = time.time()
 
@@ -207,6 +216,19 @@ class TSPSolver:
 		results['soln'] = best_solution
 		return results
 
+	# Building the new route and calculating the distance of the new route can be a very expensive
+	# operation, usually O(n) where n is the number of vertices in the route. This can be converted
+	# into an O(1) operation. Since a 2-opt operation involves removing 2 edges and adding 2 different
+	# edges we can subtract and add the distances of only those edges.
+	#
+	# If length_delta is negative that would mean that the new distance after the swap would be smaller.
+	# Once it is known that lengthDelta is negative, then we perform a 2-opt swap. This saves us a lot
+	# of computation.
+	def lengthDeltaFromTwoOpt(self, cities, i, j):
+		return -cities[i].costTo(cities[(i + 1) % len(cities)]) \
+					               - cities[j].costTo(cities[(j + 1) % len(cities)]) \
+					               + cities[i].costTo(cities[j]) \
+					               + cities[(i + 1) % len(cities)].costTo(cities[(j + 1) % len(cities)])
 
 	def twoOptSwap(self, path, v1, v2):
 		new_path = []
